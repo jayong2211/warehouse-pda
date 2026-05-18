@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Warehouse Picker PDA</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 10px; }
+    h2 { margin-bottom: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+    input[type=number] { width: 60px; }
+    #loading { display: none; font-weight: bold; margin-top: 10px; color: green; }
+    button { padding: 3px 6px; }
+  </style>
+</head>
+<body>
+  <h2>Warehouse PDA Picker</h2>
+
+  Barcode: <input type="text" id="barcode" autofocus>
+  <button id="searchBtn">Search</button>
+
+  <div id="loading">Loading...</div>
+
+  <table id="resultTable">
+    <thead>
+      <tr>
+        <th>Site</th>
+        <th>Qty</th>
+        <th>Pick Qty</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+// ------------------ 配置 ------------------
+const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbPaf-qnNElx8rLtq6HeWjhbOb6Yon0gfSJuxsGbCjrkdxu/exec"; 
+// 替换成你自己的 Apps Script Web App URL
+// ------------------------------------------
+
+const barcodeInput = document.getElementById("barcode");
+const searchBtn = document.getElementById("searchBtn");
+const resultTable = document.getElementById("resultTable").getElementsByTagName("tbody")[0];
+const loading = document.getElementById("loading");
+
+// 显示/隐藏 loading
+function showLoading(show) {
+  loading.style.display = show ? "block" : "none";
+}
+
+// 搜索 barcode
+async function searchBarcode() {
+  const barcode = barcodeInput.value.trim();
+  if (!barcode) return alert("请输入 barcode");
+
+  showLoading(true);
+
+  try {
+    const res = await fetch(`${API_URL}?action=search&barcode=${barcode}`);
+    const data = await res.json();
+    showLoading(false);
+
+    if (!data.success || data.data.length === 0) {
+      alert("没有找到对应数据");
+      resultTable.innerHTML = "";
+      return;
+    }
+
+    // 渲染 table
+    resultTable.innerHTML = "";
+    data.data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.site}</td>
+        <td>${row.qty}</td>
+        <td><input type="number" min="0"></td>
+        <td><button onclick="submitPick(this, '${row.barcode}', ${row.rowIndex})">Submit</button></td>
+      `;
+      resultTable.appendChild(tr);
+    });
+
+  } catch(err) {
+    showLoading(false);
+    alert("搜索失败: " + err);
+  }
+}
+
+// 提交 pick qty
+async function submitPick(button, barcode, rowIndex) {
+  const tr = button.parentElement.parentElement;
+  const pickInput = tr.querySelector("input[type=number]");
+  const pickQty = pickInput.value.trim();
+
+  if (!pickQty || Number(pickQty) <= 0) return alert("请输入 pick qty");
+
+  showLoading(true);
+  button.disabled = true;
+
+  try {
+    const res = await fetch(`${API_URL}?action=submit&barcode=${barcode}&pickQty=${pickQty}`);
+    const data = await res.json();
+    showLoading(false);
+    button.disabled = false;
+
+    if (data.success) {
+      alert("Success! 剩余 qty: " + data.remaining);
+      tr.querySelector("td:nth-child(2)").textContent = data.remaining; // 更新 qty
+      pickInput.value = "";
+    } else {
+      alert("Fail: " + data.message + (data.remaining !== undefined ? " 剩余 qty: " + data.remaining : ""));
+    }
+
+  } catch(err) {
+    showLoading(false);
+    button.disabled = false;
+    alert("提交失败: " + err);
+  }
+}
+
+// 支持回车自动搜索
+barcodeInput.addEventListener("keypress", function(e) {
+  if (e.key === "Enter") searchBarcode();
+});
+searchBtn.addEventListener("click", searchBarcode);
+
+</script>
+</body>
+</html>
