@@ -1,114 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>PDA Picker</title>
+  <meta charset="UTF-8">
+  <title>Warehouse PDA Picker</title>
 
-<style>
-
-/* ===== base ===== */
-body {
-  font-family: Arial;
-  margin: 0;
-  padding: 6px;
-  font-size: 14px;
-}
-
-/* ===== title shrink ===== */
-h2 {
-  font-size: 15px;
-  margin: 2px 0 6px 0;
-}
-
-/* ===== TOP BAR ULTRA COMPACT ===== */
-.top-bar {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 6px;
-  align-items: center;
-}
-
-/* barcode input compact */
-#barcode {
-  flex: 1;
-  font-size: 14px;
-  padding: 6px;
-  height: 34px;
-  box-sizing: border-box;
-}
-
-/* buttons compact */
-button {
-  font-size: 12px;
-  padding: 6px 8px;
-  height: 34px;
-  min-width: 60px;
-}
-
-/* loading smaller */
-#loading {
-  font-size: 12px;
-  margin: 4px 0;
-  color: green;
-}
-
-/* ===== TABLE COMPACT ===== */
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-/* hide header to save space */
-thead {
-  display: none;
-}
-
-/* row compact card */
-tr {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr 1fr;
-  gap: 4px;
-  margin-bottom: 5px;
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-/* cells tighter */
-td {
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-/* qty emphasis */
-td:nth-child(2) {
-  font-weight: bold;
-}
-
-/* input ultra compact */
-input[type=number] {
-  width: 100%;
-  font-size: 14px;
-  padding: 4px;
-  height: 30px;
-  text-align: center;
-}
-
-</style>
+  <style>
+    body { font-family: Arial; margin: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    input { padding: 5px; width: 80px; }
+    button { padding: 5px 10px; margin-left: 5px; }
+    #loading { display: none; color: green; font-weight: bold; }
+  </style>
 </head>
 
 <body>
 
-<h2>Warehouse PDA</h2>
+<h2>Warehouse PDA Picker</h2>
 
-<div class="top-bar">
-  <input id="barcode" placeholder="Scan barcode">
-  <button onclick="searchBarcode()">Search</button>
-</div>
-
+Barcode:
+<input type="text" id="barcode">
+<button onclick="searchBarcode()">Search</button>
 <button onclick="submitAll()">Submit</button>
 
 <div id="loading">Loading...</div>
@@ -118,91 +30,108 @@ input[type=number] {
     <tr>
       <th>Site</th>
       <th>Qty</th>
-      <th>Pick</th>
+      <th>Pick Qty</th>
     </tr>
   </thead>
   <tbody id="tbody"></tbody>
 </table>
 
 <script>
+
 const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbPaf-qnNElx8rLtq6HeWjhbOb6Yon0gfSJuxsGbCjrkdxu/exec";
 
 function showLoading(v){
   document.getElementById("loading").style.display = v ? "block" : "none";
 }
 
+// ---------------- SEARCH ----------------
 async function searchBarcode(){
 
   const barcode = document.getElementById("barcode").value.trim();
-  if(!barcode) return alert("Scan barcode");
+  if(!barcode) return alert("请输入 barcode");
 
   showLoading(true);
 
-  const res = await fetch(`${API_URL}?action=search&barcode=${barcode}`);
-  const data = await res.json();
+  try {
 
-  showLoading(false);
+    const res = await fetch(`${API_URL}?action=search&barcode=${barcode}`);
+    const data = await res.json();
 
-  const tbody = document.getElementById("tbody");
-  tbody.innerHTML = "";
+    showLoading(false);
 
-  data.data.forEach(r=>{
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
 
-    const tr = document.createElement("tr");
+    data.data.forEach(r => {
+      const tr = document.createElement("tr");
 
-    tr.innerHTML = `
-      <td>${r.site}</td>
-      <td>${r.qty}</td>
-      <td>
-        <input type="number"
-               class="pick"
-               data-id="${r.rowIndex}">
-      </td>
-    `;
+      tr.innerHTML = `
+        <td>${r.site}</td>
+        <td>${r.qty}</td>
+        <td>
+          <input type="number" class="pick" data-id="${r.rowIndex}">
+        </td>
+      `;
 
-    tbody.appendChild(tr);
-  });
+      tbody.appendChild(tr);
+    });
+
+  } catch(err){
+    showLoading(false);
+    alert("Search error: " + err);
+  }
 }
 
+// ---------------- SUBMIT (FIXED) ----------------
 async function submitAll(){
 
   const inputs = document.querySelectorAll(".pick");
+
   let updates = [];
 
   inputs.forEach(i=>{
-    if(i.value && Number(i.value) > 0){
+    const v = i.value;
+    if(v && Number(v) > 0){
       updates.push({
         rowIndex: i.dataset.id,
-        pickQty: i.value
+        pickQty: v
       });
     }
   });
 
   if(updates.length === 0){
-    alert("No qty");
+    alert("没有 qty");
     return;
   }
 
   showLoading(true);
 
-  const form = new URLSearchParams();
-  form.append("action", "submitAll");
-  form.append("updates", JSON.stringify(updates));
+  try {
 
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: form
-  });
+    // ⭐ 关键：form-urlencoded（不会 CORS preflight）
+    const form = new URLSearchParams();
+    form.append("action", "submitAll");
+    form.append("updates", JSON.stringify(updates));
 
-  const data = await res.json();
+    const res = await fetch(API_URL, {
+      method: "POST",
+      body: form
+    });
 
-  showLoading(false);
+    const data = await res.json();
 
-  if(data.success){
-    alert("Success");
-    searchBarcode();
-  } else {
-    alert("Fail");
+    showLoading(false);
+
+    if(data.success){
+      alert("Success");
+      searchBarcode();
+    } else {
+      alert("Fail: " + data.message);
+    }
+
+  } catch(err){
+    showLoading(false);
+    alert("提交失败: " + err);
   }
 }
 
