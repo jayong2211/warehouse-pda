@@ -6,10 +6,10 @@
 
   <style>
     body { font-family: Arial; margin: 10px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    table { border-collapse: collapse; width: 40%; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    input { padding: 5px; width: 80px; }
-    button { padding: 5px 10px; margin-left: 5px; }
+    input { padding: 10px; width: 80px; }
+    button { padding: 10px 50px; margin-left: 5px; }
     #loading { display: none; color: green; font-weight: bold; }
   </style>
 </head>
@@ -48,7 +48,7 @@ function showLoading(v){
 async function searchBarcode(){
 
   const barcode = document.getElementById("barcode").value.trim();
-  if(!barcode) return alert("请输入 barcode");
+  if(!barcode) return alert("Please Enter Barcode");
 
   showLoading(true);
 
@@ -100,7 +100,7 @@ async function submitAll(){
   });
 
   if(updates.length === 0){
-    alert("没有 qty");
+    alert("Not Enough Qty");
     return;
   }
 
@@ -131,7 +131,7 @@ async function submitAll(){
 
   } catch(err){
     showLoading(false);
-    alert("提交失败: " + err);
+    alert("Fail: " + err);
   }
 }
 
