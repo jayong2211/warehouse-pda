@@ -14,116 +14,233 @@
   </style>
 </head>
 <body>
-  <h2>Warehouse PDA Picker</h2>
 
-  Barcode: <input type="text" id="barcode" autofocus>
-  <button id="searchBtn">Search</button>
+<h2>Warehouse PDA Picker</h2>
 
-  <div id="loading">Loading...</div>
+Barcode:
+<input type="text" id="barcode" autofocus>
 
-  <table id="resultTable">
-    <thead>
-      <tr>
-        <th>Site</th>
-        <th>Qty</th>
-        <th>Pick Qty</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<button id="searchBtn">Search</button>
+
+<button id="submitAllBtn">Submit</button>
+
+<div id="loading">Loading...</div>
+
+<table id="resultTable">
+  <thead>
+    <tr>
+      <th>Site</th>
+      <th>Qty</th>
+      <th>Pick Qty</th>
+    </tr>
+  </thead>
+
+  <tbody></tbody>
+</table>
 
 <script>
+
 // ------------------ 配置 ------------------
-const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbPaf-qnNElx8rLtq6HeWjhbOb6Yon0gfSJuxsGbCjrkdxu/exec"; 
-// 替换成你自己的 Apps Script Web App URL
+
+const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbPaf-qnNElx8rLtq6HeWjhbOb6Yon0gfSJuxsGbCjrkdxu/exec";
+
 // ------------------------------------------
 
 const barcodeInput = document.getElementById("barcode");
+
 const searchBtn = document.getElementById("searchBtn");
-const resultTable = document.getElementById("resultTable").getElementsByTagName("tbody")[0];
+
+const submitAllBtn = document.getElementById("submitAllBtn");
+
+const resultTable = document
+  .getElementById("resultTable")
+  .getElementsByTagName("tbody")[0];
+
 const loading = document.getElementById("loading");
 
-// 显示/隐藏 loading
+
+// loading
 function showLoading(show) {
+
   loading.style.display = show ? "block" : "none";
+
 }
+
 
 // 搜索 barcode
 async function searchBarcode() {
+
   const barcode = barcodeInput.value.trim();
-  if (!barcode) return alert("请输入 barcode");
+
+  if (!barcode) {
+
+    alert("请输入 barcode");
+
+    return;
+
+  }
 
   showLoading(true);
 
   try {
-    const res = await fetch(`${API_URL}?action=search&barcode=${barcode}`);
+
+    const res = await fetch(
+      `${API_URL}?action=search&barcode=${barcode}`
+    );
+
     const data = await res.json();
+
     showLoading(false);
 
     if (!data.success || data.data.length === 0) {
+
       alert("没有找到对应数据");
+
       resultTable.innerHTML = "";
+
       return;
+
     }
 
-    // 渲染 table
+    // 清空 table
     resultTable.innerHTML = "";
+
+    // render rows
     data.data.forEach(row => {
+
       const tr = document.createElement("tr");
+
       tr.innerHTML = `
         <td>${row.site}</td>
         <td>${row.qty}</td>
-        <td><input type="number" min="0"></td>
-        <td><button onclick="submitPick(this, '${row.barcode}', ${row.rowIndex})">Submit</button></td>
+        <td>
+          <input 
+            type="number"
+            min="0"
+            class="pickQty"
+            data-rowindex="${row.rowIndex}"
+          >
+        </td>
       `;
+
       resultTable.appendChild(tr);
+
     });
 
   } catch(err) {
+
     showLoading(false);
+
     alert("搜索失败: " + err);
+
   }
+
 }
 
-// 提交 pick qty
-async function submitPick(button, barcode, rowIndex) {
-  const tr = button.parentElement.parentElement;
-  const pickInput = tr.querySelector("input[type=number]");
-  const pickQty = pickInput.value.trim();
 
-  if (!pickQty || Number(pickQty) <= 0) return alert("请输入 pick qty");
+// submit 全部
+async function submitAll() {
+
+  const inputs = document.querySelectorAll(".pickQty");
+
+  let updates = [];
+
+  inputs.forEach(input => {
+
+    const qty = input.value.trim();
+
+    if (qty && Number(qty) > 0) {
+
+      updates.push({
+
+        rowIndex: input.dataset.rowindex,
+
+        pickQty: qty
+
+      });
+
+    }
+
+  });
+
+  if (updates.length === 0) {
+
+    alert("没有输入任何 qty");
+
+    return;
+
+  }
 
   showLoading(true);
-  button.disabled = true;
+
+  submitAllBtn.disabled = true;
 
   try {
-    const res = await fetch(`${API_URL}?action=submit&barcode=${barcode}&pickQty=${pickQty}`);
+
+    const res = await fetch(API_URL, {
+
+      method: "POST",
+
+      body: JSON.stringify({
+
+        action: "submitAll",
+
+        updates: updates
+
+      })
+
+    });
+
     const data = await res.json();
+
     showLoading(false);
-    button.disabled = false;
+
+    submitAllBtn.disabled = false;
 
     if (data.success) {
-      alert("Success! 剩余 qty: " + data.remaining);
-      tr.querySelector("td:nth-child(2)").textContent = data.remaining; // 更新 qty
-      pickInput.value = "";
+
+      alert("Update Success");
+
+      // refresh current barcode
+      searchBarcode();
+
     } else {
-      alert("Fail: " + data.message + (data.remaining !== undefined ? " 剩余 qty: " + data.remaining : ""));
+
+      alert("Fail: " + data.message);
+
     }
 
   } catch(err) {
+
     showLoading(false);
-    button.disabled = false;
+
+    submitAllBtn.disabled = false;
+
     alert("提交失败: " + err);
+
   }
+
 }
 
-// 支持回车自动搜索
+
+// 回车自动 search
 barcodeInput.addEventListener("keypress", function(e) {
-  if (e.key === "Enter") searchBarcode();
+
+  if (e.key === "Enter") {
+
+    searchBarcode();
+
+  }
+
 });
+
+
+// button
 searchBtn.addEventListener("click", searchBarcode);
 
+submitAllBtn.addEventListener("click", submitAll);
+
 </script>
+
 </body>
 </html>
