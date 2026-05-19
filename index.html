@@ -2,53 +2,30 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Warehouse Picker PDA</title>
+  <title>Warehouse PDA Picker</title>
 
   <style>
-    body { font-family: Arial, sans-serif; margin: 10px; }
-    h2 { margin-bottom: 10px; }
-
-    input { padding: 5px; }
+    body { font-family: Arial; margin: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    input { padding: 5px; width: 80px; }
     button { padding: 5px 10px; margin-left: 5px; }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    th, td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      text-align: center;
-    }
-
-    input[type=number] {
-      width: 80px;
-    }
-
-    #loading {
-      display: none;
-      font-weight: bold;
-      margin-top: 10px;
-      color: green;
-    }
+    #loading { display: none; color: green; font-weight: bold; }
   </style>
 </head>
 
 <body>
 
-<h2>Warehouse PDA Picker1</h2>
+<h2>Warehouse PDA Picker</h2>
 
 Barcode:
-<input type="text" id="barcode" autofocus>
-
-<button id="searchBtn">Search</button>
-<button id="submitAllBtn">Submit</button>
+<input type="text" id="barcode">
+<button onclick="searchBarcode()">Search</button>
+<button onclick="submitAll()">Submit</button>
 
 <div id="loading">Loading...</div>
 
-<table id="resultTable">
+<table>
   <thead>
     <tr>
       <th>Site</th>
@@ -56,35 +33,22 @@ Barcode:
       <th>Pick Qty</th>
     </tr>
   </thead>
-  <tbody></tbody>
+  <tbody id="tbody"></tbody>
 </table>
 
 <script>
 
-// ================= CONFIG =================
 const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbPaf-qnNElx8rLtq6HeWjhbOb6Yon0gfSJuxsGbCjrkdxu/exec";
 
-// ================= ELEMENTS =================
-const barcodeInput = document.getElementById("barcode");
-const searchBtn = document.getElementById("searchBtn");
-const submitAllBtn = document.getElementById("submitAllBtn");
-const tbody = document.querySelector("#resultTable tbody");
-const loading = document.getElementById("loading");
-
-// ================= UI =================
-function showLoading(state) {
-  loading.style.display = state ? "block" : "none";
+function showLoading(v){
+  document.getElementById("loading").style.display = v ? "block" : "none";
 }
 
-// ================= SEARCH =================
-async function searchBarcode() {
+// ---------------- SEARCH ----------------
+async function searchBarcode(){
 
-  const barcode = barcodeInput.value.trim();
-
-  if (!barcode) {
-    alert("请输入 barcode");
-    return;
-  }
+  const barcode = document.getElementById("barcode").value.trim();
+  if(!barcode) return alert("请输入 barcode");
 
   showLoading(true);
 
@@ -95,109 +59,81 @@ async function searchBarcode() {
 
     showLoading(false);
 
-    if (!data.success || !data.data.length) {
-      alert("没有找到数据");
-      tbody.innerHTML = "";
-      return;
-    }
-
+    const tbody = document.getElementById("tbody");
     tbody.innerHTML = "";
 
-    data.data.forEach(row => {
-
+    data.data.forEach(r => {
       const tr = document.createElement("tr");
 
       tr.innerHTML = `
-        <td>${row.site}</td>
-        <td>${row.qty}</td>
+        <td>${r.site}</td>
+        <td>${r.qty}</td>
         <td>
-          <input type="number"
-                 min="0"
-                 class="pickQty"
-                 data-rowindex="${row.rowIndex}">
+          <input type="number" class="pick" data-id="${r.rowIndex}">
         </td>
       `;
 
       tbody.appendChild(tr);
-
     });
 
-  } catch (err) {
+  } catch(err){
     showLoading(false);
-    alert("Search 失败: " + err);
+    alert("Search error: " + err);
   }
 }
 
-// ================= SUBMIT ALL =================
-async function submitAll() {
+// ---------------- SUBMIT (FIXED) ----------------
+async function submitAll(){
 
-  const inputs = document.querySelectorAll(".pickQty");
+  const inputs = document.querySelectorAll(".pick");
 
   let updates = [];
 
-  inputs.forEach(input => {
-
-    const qty = input.value.trim();
-
-    if (qty && Number(qty) > 0) {
+  inputs.forEach(i=>{
+    const v = i.value;
+    if(v && Number(v) > 0){
       updates.push({
-        rowIndex: input.dataset.rowindex,
-        pickQty: Number(qty)
+        rowIndex: i.dataset.id,
+        pickQty: v
       });
     }
-
   });
 
-  if (updates.length === 0) {
-    alert("没有输入 qty");
+  if(updates.length === 0){
+    alert("没有 qty");
     return;
   }
 
   showLoading(true);
-  submitAllBtn.disabled = true;
 
   try {
 
+    // ⭐ 关键：form-urlencoded（不会 CORS preflight）
+    const form = new URLSearchParams();
+    form.append("action", "submitAll");
+    form.append("updates", JSON.stringify(updates));
+
     const res = await fetch(API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        action: "submitAll",
-        updates: updates
-      })
+      body: form
     });
 
     const data = await res.json();
 
     showLoading(false);
-    submitAllBtn.disabled = false;
 
-    if (data.success) {
-      alert("Update Success");
-      searchBarcode(); // refresh
+    if(data.success){
+      alert("Success");
+      searchBarcode();
     } else {
       alert("Fail: " + data.message);
     }
 
-  } catch (err) {
+  } catch(err){
     showLoading(false);
-    submitAllBtn.disabled = false;
     alert("提交失败: " + err);
   }
 }
-
-// ================= EVENTS =================
-searchBtn.addEventListener("click", searchBarcode);
-
-submitAllBtn.addEventListener("click", submitAll);
-
-barcodeInput.addEventListener("keypress", function(e) {
-  if (e.key === "Enter") {
-    searchBarcode();
-  }
-});
 
 </script>
 
