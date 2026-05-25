@@ -19,7 +19,7 @@
 <h2>Warehouse PDA Picker</h2>
 
 Barcode:
-<input type="text" id="barcode">
+<input type="text" id="barcode" onkeypress="handleKey(event)">
 <button onclick="searchBarcode()">Search</button>
 <button onclick="submitAll()">Submit</button>
 
@@ -42,6 +42,13 @@ const API_URL = "https://script.google.com/macros/s/AKfycbxQ_VDmvw-Va7qMvpvzlGbP
 
 function showLoading(v){
   document.getElementById("loading").style.display = v ? "block" : "none";
+}
+
+// ---------------- AUTO SEARCH ON ENTER ----------------
+function handleKey(e){
+  if(e.key === "Enter"){
+    searchBarcode();
+  }
 }
 
 // ---------------- SEARCH ----------------
