@@ -11,12 +11,6 @@
     input { padding: 20px; width: 600px; font-size: 50px; }
     button { padding: 20px 80px; margin-left: 10px; font-size: 50px; }
     #loading { display: none; color: green; font-weight: bold; font-size: 150px; }
-    
-    td input[type="number"]{
-      width: 180px;
-      padding: 10px;
-      font-size: 40px;
-    }
   </style>
 </head>
 
@@ -82,7 +76,7 @@ async function searchBarcode(){
         <td>${r.site}</td>
         <td>${r.qty}</td>
         <td>
-          <input type="number" class="pickqty" data-id="${r.rowIndex}">
+          <input type="number" class="pick" data-id="${r.rowIndex}">
         </td>
       `;
 
